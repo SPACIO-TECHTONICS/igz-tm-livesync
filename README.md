@@ -1,0 +1,198 @@
+# IngeTrazo Twinmotion LiveSync Extension
+
+This extension provides real-time synchronization between **IngeTrazo** (open-source 3D CAD/BIM modeler) and **Twinmotion** using the Epic Games Datasmith DirectLink protocol.
+
+---
+
+## References & Attribution
+
+This project is built directly on concepts and patterns from two primary references:
+
+### 1. `knTMSync` (Rhino Plugin Command)
+- **Source**: `knTMSync_cmd.py` from Roebuck Rhino Python plugin.
+- **Concepts Adopted**:
+  - **Sequential Option Workflow**: Automated naming and management of `TM Option N` layer states without manual text input.
+  - **Numeric Option Sorting**: Natural numeric sorting ensuring `TM Option 2` precedes `TM Option 10`.
+  - **Temporary Object Unhiding**: Automatically unhides objects on active export layers so Twinmotion receives all visible geometry.
+  - **Strict State Restoration (`try...finally`)**: Ensures that working layer visibility, hidden objects, and viewport camera projections restore completely, even if synchronization fails.
+
+### 2. `hamzah1985/ingetrazo-twinmotion-sync` (GitHub Reference)
+- **Source**: Open-source connector for IngeTrazo and Twinmotion ([hamzah1985/ingetrazo-twinmotion-sync](https://github.com/hamzah1985/ingetrazo-twinmotion-sync)).
+- **Concepts Adopted**:
+  - **Independent C# Background Worker (`DatasmithWorker.exe`)**: Executes unmanaged Datasmith SDK operations in an external process via `subprocess.Popen` to prevent freezing the IngeTrazo Qt user interface.
+  - **Native Datasmith P/Invoke Interop**: Directly calls Epic's `DatasmithFacadeCSharp.dll` and `tbbmalloc.dll` to manage Unreal MessageBus broadcasts on UDP port 6666.
+  - **DCC Camera Sync**: Real-time perspective camera streaming from IngeTrazo to Twinmotion viewports (~28 updates/sec).
+  - **SVG Action Toolbar**: Minimal toolbar layout featuring Connect, Sync Now, Option +, Camera, and Disconnect actions.
+  - **Automated Setup Helper**: Compiles the worker using the local .NET compiler and installs files into the user plugins folder.
+
+---
+
+## Features
+
+### 1. Sequential Option Management (knTMSync)
+- Saves and updates `TM Option N` layer visibility presets.
+- Sorts options numerically (`TM Option 2` displays before `TM Option 10`).
+- Generates the next sequential option name automatically without manual text input.
+
+### 2. State Preservation (`try...finally`)
+- Saves the working camera projection before export.
+- Caches active working layer visibility states before export.
+- Temporarily unhides hidden objects on active export layers during synchronization.
+- Restores all working layers, camera projections, and hidden objects after export.
+
+### 3. Real-Time DCC Camera Sync
+- Streams active IngeTrazo camera perspectives to Twinmotion at ~25 to 28 updates per second.
+- The Twinmotion viewport follows the IngeTrazo modeler view in real time (requires Twinmotion 2025.2 or newer).
+
+### 4. Custom SVG Toolbar & Side Panel
+- Provides a compact toolbar with custom SVG actions:
+  - **Connect**: Starts the background DirectLink worker.
+  - **Sync Now**: Pushes the current model snapshot to Twinmotion.
+  - **Option +**: Creates the next sequential `TM Option N` preset.
+  - **Camera**: Toggles real-time DCC camera tracking.
+  - **Disconnect**: Stops the worker and closes network sockets.
+- Provides a dockable PySide6 side panel in the IngeTrazo side tray.
+- Uses neutral dark slate, emerald green, and amber colors without blue colors or gradients.
+
+---
+
+## Architecture & Design Decisions
+
+The extension uses a three-tier architecture:
+
+```text
+[ IngeTrazo (Python / PySide6) ]
+           │  (Local TCP Port 19850 - JSON IPC)
+           ▼
+[ DatasmithWorker.exe (C# / .NET) ]
+           │  (Native P/Invoke)
+           ▼
+[ DatasmithFacadeCSharp.dll + tbbmalloc.dll ]
+           │  (Unreal MessageBus / UDP Port 6666)
+           ▼
+[ Twinmotion (Direct Link Receiver) ]
+```
+
+### Design Decisions:
+1. **Out-of-Process Background Worker (`DatasmithWorker.exe`)**:
+   - Native C++ Datasmith operations run in an independent process via `subprocess.Popen`.
+   - Prevents memory violations or blocking operations from freezing the IngeTrazo Qt user interface.
+2. **Native P/Invoke Interop**:
+   - The worker directly calls `DatasmithFacadeCSharp.dll` without external Rhino dependencies.
+   - Operates completely standalone without requiring Rhino or Unreal Editor to run.
+3. **Unreal MessageBus Messaging**:
+   - `FDatasmithExporterManager::Initialize` is called with `bEnableMessaging = true`.
+   - Broadcasts UDP beacons on port 6666 so Twinmotion immediately discovers the source.
+4. **Coordinate Scaling**:
+   - Automatically converts IngeTrazo meters to Twinmotion centimeters ($\times 100$ scale factor).
+
+---
+
+## Repository Files
+
+```text
+f:\igz-tm-livesync\
+├── .env                # Environment settings (ports, names, unit scale)
+├── .env.example        # Configuration template
+├── .gitignore          # Git exclusion rules
+├── plugin.json         # Extension manifest for IngeTrazo
+├── __init__.py         # Package entry point
+├── igz_tm_sync.py      # Core extension, tool registration, and side panel
+├── directlink_bridge.py# Worker process manager and TCP IPC client
+├── mesh_exporter.py    # Geometry extraction, triangulation, and materials
+├── DatasmithWorker.cs  # C# background worker source (Datasmith P/Invoke)
+├── DatasmithWorker.exe # Compiled 64-bit worker executable
+├── setup_local.py      # Build and deployment helper
+├── test_extension.py   # Automated test suite
+├── icons/              # Custom SVG toolbar icons (emerald, amber, neutral)
+└── README.md           # Documentation
+```
+
+---
+
+## Requirements
+
+- **Operating System**: Windows 10 / 11 (64-bit).
+- **IngeTrazo**: Installed on your system.
+- **Twinmotion**: Version 2025.2 or newer (tested with Twinmotion 2026.1).
+- **Compiler**: Windows .NET Framework 64-bit C# compiler (`csc.exe` in `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\`).
+- **Datasmith Runtime**: `DatasmithFacadeCSharp.dll` and `tbbmalloc.dll` (installed automatically with the Rhino Datasmith Exporter at `C:\ProgramData\McNeel\Rhinoceros\7.0\Plug-ins\Datasmith Rhino Exporter (...)` or provided in a custom directory).
+
+---
+
+## Setup & Deployment
+
+### Automatic Setup (Recommended)
+Run the setup helper to compile the worker and install all files into IngeTrazo:
+
+```powershell
+python setup_local.py
+```
+
+If your Datasmith runtime files are in a custom folder, pass the `--vendor-dir` argument:
+
+```powershell
+python setup_local.py --vendor-dir "C:\DatasmithRuntime"
+```
+
+### Installation Path
+The setup script copies the extension to:
+- `%APPDATA%\ingetrazo\plugins\igz_tm_livesync\`
+
+---
+
+## How to Use
+
+1. **Start Twinmotion**:
+   - Launch Twinmotion and create a new project.
+2. **Start IngeTrazo**:
+   - Launch IngeTrazo and open your 3D project.
+3. **Open the LiveSync Tool**:
+   - Open **Extensions** -> **Twinmotion LiveSync** (or press `Ctrl+Shift+T`).
+   - The toolbar and the **Twinmotion LiveSync** side panel will display.
+4. **Manage Options**:
+   - Click **`+ Create Next Option`** to capture current layer visibility as `TM Option N`.
+   - Click **`Update from Viewport`** to save changes to the current option.
+5. **Connect & Synchronize**:
+   - Click the **Connect** icon (or **⚡ Sync to Twinmotion** in the side panel).
+   - IngeTrazo launches the background worker and registers the DirectLink source.
+6. **Import in Twinmotion**:
+   - In Twinmotion, open **Import** -> **DIRECT LINK**.
+   - Select **IngeTrazo LiveSync** in the **Direct Link settings source** dropdown.
+   - Click **Import**.
+7. **Enable Real-Time Camera Sync**:
+   - Click the **Camera** icon in IngeTrazo (or check **🎥 DCC Camera Sync** in the side panel).
+   - In Twinmotion viewport settings, enable **DCC Camera Sync** -> **IngeTrazo Active View**.
+   - Moving your camera in IngeTrazo immediately updates the Twinmotion camera view.
+
+---
+
+## Configuration (`.env`)
+
+Configuration settings are stored in [.env](file:///f:/igz-tm-livesync/.env):
+
+```ini
+# Network settings
+DIRECTLINK_HOST=127.0.0.1
+DIRECTLINK_PORT=6666
+
+# Source and stream labels displayed in Twinmotion
+DIRECTLINK_SOURCE_NAME=IngeTrazo
+DIRECTLINK_STREAM_NAME=IngeTrazo LiveSync
+
+# Coordinate unit scaling (1 meter = 100 centimeters)
+DIRECTLINK_UNIT_SCALE=100.0
+```
+
+> [!NOTE]
+> Do not store sensitive passwords or credentials in `.env`.
+
+---
+
+## Testing & Verification
+
+Run the test suite to verify option sorting, state restoration, triangulation, and snapshot generation:
+
+```powershell
+python test_extension.py
+```

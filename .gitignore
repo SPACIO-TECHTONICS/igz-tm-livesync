@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Environment & Credentials
+.env
+
+# Build outputs & executables
+*.exe
+*.dll
+*.pdb
+
+# Diagnostics & Scratch
+scratch/
+dump_exports.py
+inspect_*.py
+test_init_overload.py
+keep_alive_test.py
+test_directlink_native.py
+
+# Upstream repository
+upstream_repo/
+
