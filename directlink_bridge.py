@@ -227,6 +227,10 @@ class DirectLinkBridge:
 
         if self.worker_process:
             try:
+                if self.worker_process.stdout:
+                    self.worker_process.stdout.close()
+                if self.worker_process.stderr:
+                    self.worker_process.stderr.close()
                 self.worker_process.terminate()
                 self.worker_process.wait(timeout=2)
             except Exception:

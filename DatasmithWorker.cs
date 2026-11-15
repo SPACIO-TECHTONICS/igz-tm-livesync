@@ -64,6 +64,9 @@ namespace IngeTrazoTwinmotionWorker
         [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeDirectLink_UpdateScene", CallingConvention = CallingConvention.Cdecl)]
         private static extern bool UpdateScene(IntPtr directLink, IntPtr scene);
 
+        [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeDirectLink_CloseCurrentSource", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void CloseCurrentSource(IntPtr directLink);
+
         [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeDirectLink_ValidateCommunicationSetup", CallingConvention = CallingConvention.Cdecl)]
         private static extern bool ValidateCommunicationSetup();
 
@@ -78,6 +81,9 @@ namespace IngeTrazoTwinmotionWorker
         [DllImport(DatasmithDll, EntryPoint = "CSharp_delete_FDatasmithFacadeScene", CallingConvention = CallingConvention.Cdecl)]
         private static extern void DeleteScene(IntPtr scene);
 
+        [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeScene_SetName", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void SetSceneName(IntPtr scene, [MarshalAs(UnmanagedType.LPWStr)] string name);
+
         [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeScene_SetOutputPath", CallingConvention = CallingConvention.Cdecl)]
         private static extern void SetOutputPath(IntPtr scene, [MarshalAs(UnmanagedType.LPWStr)] string outputPath);
 
@@ -89,6 +95,9 @@ namespace IngeTrazoTwinmotionWorker
 
         [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeScene_PreExport", CallingConvention = CallingConvention.Cdecl)]
         private static extern void PreExport(IntPtr scene);
+
+        [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeScene_ExportScene__SWIG_0", CallingConvention = CallingConvention.Cdecl)]
+        private static extern bool ExportScene(IntPtr scene, [MarshalAs(UnmanagedType.LPWStr)] string inOutputPath, bool bCleanUp);
 
         [DllImport(DatasmithDll, EntryPoint = "CSharp_FDatasmithFacadeScene_Reset", CallingConvention = CallingConvention.Cdecl)]
         private static extern void ResetScene(IntPtr scene);
@@ -129,6 +138,8 @@ namespace IngeTrazoTwinmotionWorker
         private static IntPtr _directLinkPtr = IntPtr.Zero;
         private static IntPtr _scenePtr = IntPtr.Zero;
         private static bool _datasmithReady = false;
+        private static string _sourceName = "IngeTrazo LiveSync";
+        private static string _cacheDir = null;
 
         static void Main(string[] args)
         {
@@ -140,10 +151,9 @@ namespace IngeTrazoTwinmotionWorker
                 _port = customPort;
             }
 
-            string sourceName = "IngeTrazo LiveSync";
             if (args.Length > 1 && !string.IsNullOrEmpty(args[1]))
             {
-                sourceName = args[1];
+                _sourceName = args[1];
             }
 
             // 1. Configure DLL search directory for native Datasmith runtime
@@ -157,7 +167,7 @@ namespace IngeTrazoTwinmotionWorker
             // 2. Initialize Datasmith Exporter Engine with Messaging enabled
             try
             {
-                InitDatasmith(sourceName);
+                InitDatasmith(_sourceName);
             }
             catch (Exception ex)
             {
@@ -223,19 +233,20 @@ namespace IngeTrazoTwinmotionWorker
             Console.WriteLine(string.Format("[DatasmithWorker] WasInitializedWithMessaging -> {0}", msgActive));
 
             // B. Initialize DirectLink with local cache directory
-            string cacheDir = Path.Combine(Path.GetTempPath(), "IngeTrazo_DirectLink");
-            if (!Directory.Exists(cacheDir))
+            _cacheDir = Path.Combine(Path.GetTempPath(), "IngeTrazo_DirectLink");
+            if (!Directory.Exists(_cacheDir))
             {
-                Directory.CreateDirectory(cacheDir);
+                Directory.CreateDirectory(_cacheDir);
             }
 
-            bool dlOk = InitDirectLink(true, cacheDir);
+            bool dlOk = InitDirectLink(true, _cacheDir);
             Console.WriteLine(string.Format("[DatasmithWorker] FDatasmithFacadeDirectLink::Init -> {0}", dlOk));
 
             // C. Create Scene and DirectLink objects
-            _scenePtr = NewScene(sourceName, "IngeTrazo", "1.0", "1.0");
-            SetOutputPath(_scenePtr, cacheDir);
-            Console.WriteLine(string.Format("[DatasmithWorker] Scene created: 0x{0:X} (output: {1})", _scenePtr.ToInt64(), cacheDir));
+            _scenePtr = NewScene(_sourceName, "IngeTrazo", "1.0", "1.0");
+            SetSceneName(_scenePtr, _sourceName);
+            SetOutputPath(_scenePtr, _cacheDir);
+            Console.WriteLine(string.Format("[DatasmithWorker] Scene created: 0x{0:X} (output: {1})", _scenePtr.ToInt64(), _cacheDir));
 
             _directLinkPtr = NewDirectLink();
             Console.WriteLine(string.Format("[DatasmithWorker] DirectLink created: 0x{0:X}", _directLinkPtr.ToInt64()));
@@ -261,6 +272,7 @@ namespace IngeTrazoTwinmotionWorker
         {
             if (_directLinkPtr != IntPtr.Zero)
             {
+                try { CloseCurrentSource(_directLinkPtr); } catch { }
                 try { DeleteDirectLink(_directLinkPtr); } catch { }
                 _directLinkPtr = IntPtr.Zero;
             }
@@ -335,7 +347,11 @@ namespace IngeTrazoTwinmotionWorker
                         if (!string.IsNullOrEmpty(binFile) && File.Exists(binFile))
                         {
                             Console.WriteLine(string.Format("[DatasmithWorker] Importing geometry from: {0}", binFile));
-                            try { ResetScene(_scenePtr); } catch { }
+                            try {
+                                ResetScene(_scenePtr);
+                                SetSceneName(_scenePtr, _sourceName);
+                                SetOutputPath(_scenePtr, _cacheDir);
+                            } catch { }
 
                             using (BinaryReader br = new BinaryReader(File.OpenRead(binFile)))
                             {
@@ -383,7 +399,9 @@ namespace IngeTrazoTwinmotionWorker
                             }
 
                             PreExport(_scenePtr);
-                            Console.WriteLine("[DatasmithWorker] Scene PreExport completed.");
+                            string udatasmithFile = Path.Combine(_cacheDir, _sourceName + ".udatasmith");
+                            ExportScene(_scenePtr, udatasmithFile, false);
+                            Console.WriteLine(string.Format("[DatasmithWorker] Scene PreExport and ExportScene to {0} completed.", udatasmithFile));
                         }
 
                         synced = UpdateScene(_directLinkPtr, _scenePtr);

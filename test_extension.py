@@ -89,8 +89,12 @@ class TestTMSyncExtension(unittest.TestCase):
 
     def setUp(self):
         self.app = MockApp()
-        self.bridge = DirectLinkBridge(source_name="Test_IngeTrazo", stream_name="Test_LiveSync")
+        self.bridge = DirectLinkBridge(source_name="Test_IngeTrazo", stream_name="Test_IngeTrazo")
         self.engine = TMSyncEngine(bridge=self.bridge)
+
+    def tearDown(self):
+        if hasattr(self, 'bridge') and self.bridge:
+            self.bridge.stop_endpoint()
 
     def test_numerical_option_sorting(self):
         """Option 2 must sort before Option 10 (as in knTMSync)."""
@@ -147,7 +151,7 @@ class TestTMSyncExtension(unittest.TestCase):
             content = f.read()
             self.assertIn("DatasmithUnrealScene", content)
             self.assertIn("Cube_01", content)
-            self.assertIn("Walls", content)
+            self.assertIn("Cube_01_Actor", content)
 
     def test_try_finally_state_restoration(self):
         """
