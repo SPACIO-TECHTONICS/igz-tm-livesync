@@ -2,8 +2,8 @@
   "name": "Twinmotion LiveSync",
   "id": "igz_tm_livesync",
   "version": "1.0.0",
-  "description": "Real-time LiveSync between IngeTrazo and Twinmotion using the Epic Games Datasmith DirectLink protocol.",
-  "author": "IngeTrazo Community",
+  "description": "Real-time LiveSync between IngeTrazo and Twinmotion using the Epic Games Datasmith DirectLink protocol with automated runtime setup.",
+  "author": "Spacio Techtonics",
   "entry_point": "igz_tm_sync.py",
   "min_ingetrazo_version": "0.1.0"
 }

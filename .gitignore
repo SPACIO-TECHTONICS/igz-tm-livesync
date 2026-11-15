@@ -22,6 +22,9 @@ inspect_*.py
 test_init_overload.py
 keep_alive_test.py
 test_directlink_native.py
+migrate_to_gpl.py
+prepare_catalog_entry.py
+igz_tm_livesync.toml
 
 # Upstream repository
 upstream_repo/
