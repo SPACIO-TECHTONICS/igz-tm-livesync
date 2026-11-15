@@ -36,25 +36,29 @@ EXCLUDE_EXTS = {".pyc", ".tmp", ".log", ".rhp", ".dll", ".pdb"}
 
 def create_release_zip(output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    folder_prefix = "igz_tm_livesync"
 
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as z:
         for f in RELEASE_FILES:
             full = ROOT / f
             if full.is_file():
-                z.write(full, arcname=f)
-                print(f"Added file: {f}")
+                z.write(full, arcname=f"{folder_prefix}/{f}")
+                print(f"Added file: {folder_prefix}/{f}")
 
         for d in RELEASE_DIRS:
             dir_path = ROOT / d
             if dir_path.is_dir():
                 for p in dir_path.rglob("*"):
                     if p.is_file() and p.suffix not in EXCLUDE_EXTS and "__pycache__" not in p.parts:
-                        rel = str(p.relative_to(ROOT))
-                        z.write(p, arcname=rel)
-                        print(f"Added asset: {rel}")
+                        rel = str(p.relative_to(ROOT)).replace("\\", "/")
+                        z.write(p, arcname=f"{folder_prefix}/{rel}")
+                        print(f"Added asset: {folder_prefix}/{rel}")
 
     size_kb = output_path.stat().st_size / 1024
+    import hashlib
+    sha256_hash = hashlib.sha256(output_path.read_bytes()).hexdigest()
     print(f"\nSuccessfully packaged: {output_path} ({size_kb:.1f} KB)")
+    print(f"SHA-256 Fingerprint: {sha256_hash}")
     return output_path
 
 
