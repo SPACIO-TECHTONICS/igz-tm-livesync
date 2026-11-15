@@ -22,9 +22,18 @@ Epic Games, Unreal, and Twinmotion runtime components remain subject to separate
 
 ## Installation & Setup
 
-You can install the extension using the desktop application or command line.
+You can set up the extension using the self-healing in-app mode, the desktop GUI installer, or the command line.
 
-### Option 1: Desktop GUI Installer (Recommended)
+### Option 1: Zero-Config In-App Self-Healing (Easiest)
+
+You do not need to install Rhino or pre-install Epic Datasmith DLLs.
+1. Copy or install the extension folder to `%APPDATA%\ingetrazo\plugins\igz_tm_livesync`.
+2. Open IngeTrazo and activate **Extensions** -> **Twinmotion LiveSync**.
+3. Click **Connect** (or **⚡ Sync to Twinmotion**).
+4. The extension automatically detects missing runtime components. It downloads the official Epic Datasmith installer online, extracts the required DLLs, and compiles the C# worker.
+5. The sidebar **Activity Log** and status banner show live progress (download percentage and compilation status).
+
+### Option 2: Desktop GUI Installer
 
 Run `python setup_app.py` or double-click `setup_app.pyw`.
 The application checks your environment automatically:
@@ -34,7 +43,7 @@ The application checks your environment automatically:
 - Verifies the installer SHA256 checksum and extracts the required runtime libraries.
 - Compiles the DirectLink worker and installs the extension to IngeTrazo with one click.
 
-### Option 2: Command Line Setup
+### Option 3: Command Line Setup
 
 Run the setup helper script:
 
@@ -53,7 +62,7 @@ python setup_local.py --vendor-dir 'C:\DatasmithRuntime'
 
 ## Features
 
-### 1. Sequential Option Management (knTMSync)
+### 1. Sequential Option Management
 - Saves and updates `TM Option N` layer visibility presets.
 - Sorts options numerically (`TM Option 2` displays before `TM Option 10`).
 - Generates the next sequential option name automatically without manual text input.
@@ -116,20 +125,26 @@ The extension uses a three-tier architecture:
 
 ```text
 f:\igz-tm-livesync\
-├── .env                # Environment settings (ports, names, unit scale)
-├── .env.example        # Configuration template
-├── .gitignore          # Git exclusion rules
-├── plugin.json         # Extension manifest for IngeTrazo
-├── __init__.py         # Package entry point
-├── igz_tm_sync.py      # Core extension, tool registration, and side panel
-├── directlink_bridge.py# Worker process manager and TCP IPC client
-├── mesh_exporter.py    # Geometry extraction, triangulation, and materials
-├── DatasmithWorker.cs  # C# background worker source (Datasmith P/Invoke)
-├── DatasmithWorker.exe # Compiled 64-bit worker executable
-├── setup_local.py      # Build and deployment helper
-├── test_extension.py   # Automated test suite
-├── icons/              # Custom SVG toolbar icons (emerald, amber, neutral)
-└── README.md           # Documentation
+├── .env                  # Environment settings (ports, names, unit scale)
+├── .env.example          # Configuration template
+├── .gitignore            # Git exclusion rules
+├── LICENSE               # Apache License, Version 2.0
+├── NOTICE.md             # Third-party notices and attribution
+├── plugin.json           # Extension manifest for IngeTrazo
+├── __init__.py           # Package entry point
+├── igz_tm_sync.py        # Core extension, tool registration, and side panel
+├── directlink_bridge.py  # Worker process manager and TCP IPC client
+├── mesh_exporter.py      # Geometry extraction, triangulation, and materials
+├── runtime_downloader.py # Automated Datasmith download and checksum verification
+├── setup_app.py          # Standalone Desktop GUI installer (Dark Emerald theme)
+├── setup_app.pyw         # Windowless double-clickable installer entry point
+├── DatasmithWorker.cs    # C# background worker source (Datasmith P/Invoke)
+├── DatasmithWorker.exe   # Compiled 64-bit worker executable
+├── setup_local.py        # Build, download, and deployment helper
+├── test_extension.py     # Extension test suite
+├── test_runtime_installer.py # Runtime installer test suite
+├── icons/                # Custom SVG toolbar icons (emerald, amber, neutral)
+└── README.md             # Documentation
 ```
 
 ---
@@ -139,29 +154,8 @@ f:\igz-tm-livesync\
 - **Operating System**: Windows 10 / 11 (64-bit).
 - **IngeTrazo**: Installed on your system.
 - **Twinmotion**: Version 2025.2 or newer (tested with Twinmotion 2026.1).
-- **Compiler**: Windows .NET Framework 64-bit C# compiler (`csc.exe` in `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\`).
-- **Datasmith Runtime**: `DatasmithFacadeCSharp.dll` and `tbbmalloc.dll` (installed automatically with the Rhino Datasmith Exporter at `C:\ProgramData\McNeel\Rhinoceros\7.0\Plug-ins\Datasmith Rhino Exporter (...)` or provided in a custom directory).
-
----
-
-## Setup & Deployment
-
-### Automatic Setup (Recommended)
-Run the setup helper to compile the worker and install all files into IngeTrazo:
-
-```powershell
-python setup_local.py
-```
-
-If your Datasmith runtime files are in a custom folder, pass the `--vendor-dir` argument:
-
-```powershell
-python setup_local.py --vendor-dir "C:\DatasmithRuntime"
-```
-
-### Installation Path
-The setup script copies the extension to:
-- `%APPDATA%\ingetrazo\plugins\igz_tm_livesync\`
+- **Compiler**: Windows .NET Framework 64-bit C# compiler (included with Windows at `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`).
+- **Datasmith Runtime**: Automatically downloaded and verified online by the extension on first run, or auto-detected if already on your system. No Rhino installation is required.
 
 ---
 
@@ -215,8 +209,8 @@ DIRECTLINK_UNIT_SCALE=100.0
 
 ## Testing & Verification
 
-Run the test suite to verify option sorting, state restoration, triangulation, and snapshot generation:
+Run the test suite to verify the installer, runtime downloader, option sorting, state restoration, triangulation, and snapshot generation:
 
 ```powershell
-python test_extension.py
+python -m unittest test_runtime_installer.py test_extension.py
 ```

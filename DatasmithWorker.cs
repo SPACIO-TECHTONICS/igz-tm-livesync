@@ -157,11 +157,32 @@ namespace IngeTrazoTwinmotionWorker
             }
 
             // 1. Configure DLL search directory for native Datasmith runtime
-            string runtimeDir = DefaultRuntimeDir;
-            if (Directory.Exists(runtimeDir))
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string vendorDir = Path.Combine(localAppData, @"IngeTrazo\twinmotion_sync\vendor");
+
+            string[] candidateDirs = new string[]
             {
-                SetDllDirectory(runtimeDir);
-                Console.WriteLine(string.Format("[DatasmithWorker] Native runtime path set: {0}", runtimeDir));
+                baseDir,
+                vendorDir,
+                @"C:\DatasmithRuntime",
+                DefaultRuntimeDir,
+                @"C:\ProgramData\McNeel\Rhinoceros\6.0\Plug-ins\Datasmith Rhino Exporter (d1fdc795-b334-4933-b680-088119cdc6bb)",
+                @"C:\ProgramData\McNeel\Rhinoceros\8.0\Plug-ins\Datasmith Rhino Exporter (d1fdc795-b334-4933-b680-088119cdc6bb)"
+            };
+
+            foreach (string dir in candidateDirs)
+            {
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    string testDll = Path.Combine(dir, DatasmithDll);
+                    if (File.Exists(testDll))
+                    {
+                        SetDllDirectory(dir);
+                        Console.WriteLine(string.Format("[DatasmithWorker] Native runtime path set: {0}", dir));
+                        break;
+                    }
+                }
             }
 
             // 2. Initialize Datasmith Exporter Engine with Messaging enabled

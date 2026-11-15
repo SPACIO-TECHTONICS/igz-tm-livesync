@@ -10,6 +10,7 @@ __pycache__/
 # Build outputs & executables
 *.exe
 *.dll
+*.rhp
 *.pdb
 
 # Diagnostics & Scratch

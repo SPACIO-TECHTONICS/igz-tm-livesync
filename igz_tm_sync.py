@@ -46,7 +46,7 @@ except ImportError:
         pass
 
 try:
-    from PySide6.QtCore import Qt, QTimer, Signal, QObject
+    from PySide6.QtCore import Qt, QTimer, Signal, QObject, QCoreApplication
     from PySide6.QtGui import QIcon, QAction
     from PySide6.QtWidgets import (
         QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -54,7 +54,7 @@ try:
     )
 except ImportError:
     try:
-        from PyQt6.QtCore import Qt, QTimer, pyqtSignal as Signal, QObject
+        from PyQt6.QtCore import Qt, QTimer, pyqtSignal as Signal, QObject, QCoreApplication
         from PyQt6.QtGui import QIcon, QAction
         from PyQt6.QtWidgets import (
             QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -64,6 +64,7 @@ except ImportError:
         class QWidget: pass
         class QObject: pass
         class QToolBar: pass
+        QCoreApplication = None
         class QIcon:
             def __init__(self, *args): pass
             def isNull(self): return False
@@ -670,6 +671,31 @@ class TMSyncDockPanel(QWidget):
 
     def _add_log(self, text: str):
         self.log_text.append(text)
+        try:
+            scrollbar = self.log_text.verticalScrollBar()
+            if scrollbar:
+                scrollbar.setValue(scrollbar.maximum())
+        except Exception:
+            pass
+
+        # Update status header during automated runtime setup
+        if hasattr(self, "status_label") and self.status_label:
+            if "Downloading" in text:
+                self.status_label.setText("⏳ Downloading Epic Datasmith Runtime...")
+                self.status_label.setStyleSheet("color: #f59e0b; font-weight: bold;")
+            elif "Compiling" in text:
+                self.status_label.setText("⏳ Compiling DirectLink Worker...")
+                self.status_label.setStyleSheet("color: #f59e0b; font-weight: bold;")
+            elif "Active (UDP 6666" in text or "Connected to DatasmithWorker" in text or "finished successfully" in text:
+                self.status_label.setText("● DirectLink Active (UDP 6666 / IPC 19850)")
+                self.status_label.setStyleSheet("color: #10b981; font-weight: bold;")
+
+        # Refresh Qt event loop so download messages render immediately
+        try:
+            if QCoreApplication:
+                QCoreApplication.processEvents()
+        except Exception:
+            pass
 
     def _on_show_toolbar_clicked(self):
         global _GLOBAL_TOOLBAR, _GLOBAL_ENGINE

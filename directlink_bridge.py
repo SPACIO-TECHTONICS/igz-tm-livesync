@@ -64,6 +64,66 @@ class DirectLinkBridge:
                 return p
         return None
 
+    def _ensure_worker_and_runtime(self, log_cb: Optional[Callable[[str], None]] = None) -> Optional[str]:
+        """
+        Self-healing setup: verifies runtime and worker executable.
+        If missing, automatically downloads official Epic Datasmith runtime online,
+        extracts required DLLs, and compiles DatasmithWorker.exe using csc.exe.
+        """
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        dll_path = os.path.join(plugin_dir, "DatasmithFacadeCSharp.dll")
+        worker_exe = self._find_worker_exe()
+
+        if worker_exe and os.path.isfile(worker_exe) and os.path.isfile(dll_path):
+            return worker_exe
+
+        self._log("Datasmith runtime or worker missing. Starting automated self-healing...", log_cb)
+        try:
+            import runtime_downloader
+            import shutil
+
+            # 1. Locate or download Datasmith runtime
+            vendor_dir = runtime_downloader.find_existing_runtime()
+            if not vendor_dir:
+                self._log("Datasmith runtime not found locally. Connecting online to Epic Games...", log_cb)
+                def on_progress(msg, pct):
+                    self._log(f"[{int(pct * 100)}%] {msg}", log_cb)
+                vendor_dir = runtime_downloader.download_and_extract_runtime(progress_callback=on_progress)
+                self._log(f"Official runtime downloaded and extracted to: {vendor_dir}", log_cb)
+
+            # 2. Copy DLLs to plugin folder so worker can load them
+            for name in ("DatasmithFacadeCSharp.dll", "tbbmalloc.dll", "DatasmithRhino6.rhp"):
+                src_file = os.path.join(str(vendor_dir), name)
+                if os.path.isfile(src_file):
+                    dst_file = os.path.join(plugin_dir, name)
+                    shutil.copy2(src_file, dst_file)
+                    self._log(f"Installed runtime component: {name}", log_cb)
+
+            # 3. Compile worker if executable is missing
+            worker_exe = self._find_worker_exe()
+            if not worker_exe or not os.path.isfile(worker_exe):
+                target_exe = os.path.join(plugin_dir, "DatasmithWorker.exe")
+                source_cs = os.path.join(plugin_dir, "DatasmithWorker.cs")
+                compiler = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), r"Microsoft.NET\Framework64\v4.0.30319\csc.exe")
+                if os.path.isfile(source_cs) and os.path.isfile(compiler):
+                    self._log("Compiling DatasmithWorker.exe with .NET compiler...", log_cb)
+                    cmd = [
+                        compiler, "/nologo", "/target:exe", "/platform:x64", "/optimize+",
+                        f"/out:{target_exe}", source_cs
+                    ]
+                    res = subprocess.run(cmd, capture_output=True, text=True)
+                    if res.returncode == 0 and os.path.isfile(target_exe):
+                        self._log("DatasmithWorker.exe compiled successfully.", log_cb)
+                        return target_exe
+                    else:
+                        self._log(f"C# compilation error: {res.stderr or res.stdout}", log_cb)
+
+            return self._find_worker_exe()
+
+        except Exception as e:
+            self._log(f"Self-healing runtime setup failed: {e}", log_cb)
+            return None
+
     def start_endpoint(self, log_cb: Optional[Callable[[str], None]] = None) -> bool:
         """Starts DatasmithWorker.exe and verifies IPC connection."""
         if self.is_connected and self._sock:
@@ -71,8 +131,14 @@ class DirectLinkBridge:
             return True
 
         worker_exe = self._find_worker_exe()
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        dll_path = os.path.join(plugin_dir, "DatasmithFacadeCSharp.dll")
+
+        if not worker_exe or not os.path.isfile(dll_path):
+            worker_exe = self._ensure_worker_and_runtime(log_cb)
+
         if not worker_exe:
-            err = f"DatasmithWorker.exe not found in plugin paths. Checked: {self._find_worker_exe()}"
+            err = f"DatasmithWorker.exe could not be located or compiled."
             self._log(f"ERROR: {err}", log_cb)
             return False
 
