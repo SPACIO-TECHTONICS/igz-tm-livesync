@@ -12,6 +12,8 @@ __pycache__/
 *.dll
 *.rhp
 *.pdb
+dist/
+*.zip
 
 # Diagnostics & Scratch
 scratch/
