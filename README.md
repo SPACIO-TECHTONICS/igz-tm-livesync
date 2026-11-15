@@ -6,24 +6,48 @@ This extension provides real-time synchronization between **IngeTrazo** (open-so
 
 ## References & Attribution
 
-This project is built directly on concepts and patterns from two primary references:
+This project is inspired by open-source community work:
 
-### 1. `knTMSync` (Rhino Plugin Command)
-- **Source**: `knTMSync_cmd.py` from Roebuck Rhino Python plugin.
-- **Concepts Adopted**:
-  - **Sequential Option Workflow**: Automated naming and management of `TM Option N` layer states without manual text input.
-  - **Numeric Option Sorting**: Natural numeric sorting ensuring `TM Option 2` precedes `TM Option 10`.
-  - **Temporary Object Unhiding**: Automatically unhides objects on active export layers so Twinmotion receives all visible geometry.
-  - **Strict State Restoration (`try...finally`)**: Ensures that working layer visibility, hidden objects, and viewport camera projections restore completely, even if synchronization fails.
+- **[hamzah1985/ingetrazo-twinmotion-sync](https://github.com/hamzah1985/ingetrazo-twinmotion-sync)** by Hamzah:
+  Provided the reference architecture for unmanaged Datasmith SDK interop, background C# worker design, and IngeTrazo Qt plugin integration.
 
-### 2. `hamzah1985/ingetrazo-twinmotion-sync` (GitHub Reference)
-- **Source**: Open-source connector for IngeTrazo and Twinmotion ([hamzah1985/ingetrazo-twinmotion-sync](https://github.com/hamzah1985/ingetrazo-twinmotion-sync)).
-- **Concepts Adopted**:
-  - **Independent C# Background Worker (`DatasmithWorker.exe`)**: Executes unmanaged Datasmith SDK operations in an external process via `subprocess.Popen` to prevent freezing the IngeTrazo Qt user interface.
-  - **Native Datasmith P/Invoke Interop**: Directly calls Epic's `DatasmithFacadeCSharp.dll` and `tbbmalloc.dll` to manage Unreal MessageBus broadcasts on UDP port 6666.
-  - **DCC Camera Sync**: Real-time perspective camera streaming from IngeTrazo to Twinmotion viewports (~28 updates/sec).
-  - **SVG Action Toolbar**: Minimal toolbar layout featuring Connect, Sync Now, Option +, Camera, and Disconnect actions.
-  - **Automated Setup Helper**: Compiles the worker using the local .NET compiler and installs files into the user plugins folder.
+---
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**; see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
+Epic Games, Unreal, and Twinmotion runtime components remain subject to separate Epic Games terms.
+
+---
+
+## Installation & Setup
+
+You can install the extension using the desktop application or command line.
+
+### Option 1: Desktop GUI Installer (Recommended)
+
+Run `python setup_app.py` or double-click `setup_app.pyw`.
+The application checks your environment automatically:
+- Checks Windows x64 and .NET Framework C# compiler (`csc.exe`).
+- Searches for the official Epic Datasmith runtime.
+- If the runtime is missing, it searches online and downloads the official Epic installer.
+- Verifies the installer SHA256 checksum and extracts the required runtime libraries.
+- Compiles the DirectLink worker and installs the extension to IngeTrazo with one click.
+
+### Option 2: Command Line Setup
+
+Run the setup helper script:
+
+```powershell
+python setup_local.py
+```
+
+The script auto-detects existing Datasmith installations or downloads missing runtime libraries automatically.
+You can also supply an existing vendor folder:
+
+```powershell
+python setup_local.py --vendor-dir 'C:\DatasmithRuntime'
+```
 
 ---
 

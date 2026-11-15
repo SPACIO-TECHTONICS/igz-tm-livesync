@@ -1,71 +1,68 @@
 """
 Local Build and Setup Helper for IngeTrazo Twinmotion LiveSync.
-Modeled after the hamzah1985/ingetrazo-twinmotion-sync setup workflow.
-
-Functions:
-- Locates Datasmith runtime binaries (DatasmithFacadeCSharp.dll, tbbmalloc.dll).
-- Compiles DatasmithWorker.cs with the Windows .NET Framework 64-bit compiler.
-- Copies the extension files into the IngeTrazo user plugins folder.
+Automates Datasmith runtime discovery, download, compilation, and extension installation.
 """
-
+import argparse
+import hashlib
+import json
 import os
-import sys
+from pathlib import Path
 import shutil
 import subprocess
-import argparse
+import sys
+import time
 
-CSC_PATH = r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-DEFAULT_INGETRAZO_PLUGINS = os.path.expandvars(r"%APPDATA%\ingetrazo\plugins\igz_tm_livesync")
+import runtime_downloader
+
+CSC_PATH = Path(os.environ.get('WINDIR', 'C:\\Windows')) / 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+DEFAULT_INGETRAZO_PLUGINS = Path(os.environ.get('APPDATA', '')) / 'ingetrazo/plugins/igz_tm_livesync'
+ROOT = Path(__file__).resolve().parent
 
 
-def find_datasmith_runtime(vendor_dir=None):
-    """Searches for DatasmithFacadeCSharp.dll in vendor directory or common paths."""
-    candidates = []
+def find_or_download_runtime(vendor_dir=None, auto_download=True):
+    """Finds existing Datasmith runtime or downloads official installer automatically."""
     if vendor_dir:
-        candidates.append(vendor_dir)
+        v = Path(vendor_dir).resolve()
+        if runtime_downloader.verify_runtime_directory(v):
+            return v
+        raise ValueError(f"Specified vendor directory does not contain verified runtime: {v}")
 
-    # Search common Rhino and Epic Games installation locations
-    candidates.extend([
-        r"C:\ProgramData\McNeel\Rhinoceros\7.0\Plug-ins\Datasmith Rhino Exporter (d1fdc795-b334-4933-b680-088119cdc6bb)",
-        r"C:\ProgramData\McNeel\Rhinoceros\7.0\Plug-ins",
-        os.path.expandvars(r"%APPDATA%\McNeel\Rhinoceros\7.0\Plug-ins"),
-        r"C:\Program Files\Epic Games\Twinmotion",
-        r"C:\Program Files\Epic Games\DatasmithCADPlugins",
-        r"C:\DatasmithRuntime"
-    ])
+    existing = runtime_downloader.find_existing_runtime()
+    if existing:
+        print(f"[Setup] Detected existing Datasmith runtime: {existing}")
+        return existing
 
-    for base in candidates:
-        if not os.path.isdir(base):
-            continue
-        for root, _, files in os.walk(base):
-            if "DatasmithFacadeCSharp.dll" in files:
-                return root
-    return None
+    if not auto_download:
+        raise FileNotFoundError("Datasmith runtime was not found. Use --vendor-dir or allow auto-download.")
+
+    print("[Setup] Datasmith runtime not found locally. Downloading official Epic installer...")
+    def on_progress(msg, pct):
+        print(f"[{int(pct*100):3d}%] {msg}")
+
+    vendor = runtime_downloader.download_and_extract_runtime(progress_callback=on_progress)
+    print(f"[Setup] Extracted runtime libraries to: {vendor}")
+    return vendor
 
 
-def compile_worker(source_file, output_exe, vendor_dir=None):
-    """Compiles the C# Datasmith worker using csc.exe."""
-    if not os.path.isfile(CSC_PATH):
-        print(f"[Error] C# compiler not found at: {CSC_PATH}")
-        return False
+def compile_worker(source_file, output_exe):
+    """Compiles the C# Datasmith worker using Windows csc.exe."""
+    if not CSC_PATH.is_file():
+        raise FileNotFoundError(f"C# compiler not found at: {CSC_PATH}")
 
-    # Stop any running DatasmithWorker before compiling
+    # Stop any running DatasmithWorker
     try:
         subprocess.run(["taskkill", "/F", "/IM", "DatasmithWorker.exe"], capture_output=True)
     except Exception:
         pass
 
-    runtime_dir = find_datasmith_runtime(vendor_dir)
-    if runtime_dir:
-        print(f"[Setup] Found Datasmith runtime at: {runtime_dir}")
-
     cmd = [
-        CSC_PATH,
+        str(CSC_PATH),
+        "/nologo",
         "/target:exe",
         "/platform:x64",
         "/optimize+",
         f"/out:{output_exe}",
-        source_file
+        str(source_file)
     ]
 
     print(f"[Setup] Compiling worker: {' '.join(cmd)}")
@@ -75,19 +72,17 @@ def compile_worker(source_file, output_exe, vendor_dir=None):
         return True
     else:
         err_msg = result.stdout if result.stdout else result.stderr
-        print(f"[Error] Compilation failed:\n{err_msg}")
-        return False
+        raise RuntimeError(f"Worker compilation failed:\n{err_msg}")
 
 
-def install_plugin(target_dir=DEFAULT_INGETRAZO_PLUGINS):
-    """Copies all extension files into IngeTrazo plugins folder."""
-    os.makedirs(target_dir, exist_ok=True)
-    src_dir = os.path.dirname(os.path.abspath(__file__))
+def install_plugin(vendor_dir, target_dir=DEFAULT_INGETRAZO_PLUGINS):
+    """Copies all extension files and runtime DLLs into IngeTrazo plugins folder."""
+    target_dir = Path(target_dir).resolve()
+    target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Stop any running DatasmithWorker process to release file lock
+    # Stop any running DatasmithWorker process to release file locks
     try:
         subprocess.run(["taskkill", "/F", "/IM", "DatasmithWorker.exe"], capture_output=True)
-        import time
         time.sleep(0.8)
     except Exception:
         pass
@@ -98,69 +93,78 @@ def install_plugin(target_dir=DEFAULT_INGETRAZO_PLUGINS):
         "igz_tm_sync.py",
         "directlink_bridge.py",
         "mesh_exporter.py",
-        ".env",
-        "README.md"
+        "DatasmithWorker.exe",
+        "README.md",
+        "LICENSE",
+        "NOTICE.md",
     ]
-    if os.path.isfile(os.path.join(src_dir, "DatasmithWorker.exe")):
-        files_to_copy.append("DatasmithWorker.exe")
 
     for fname in files_to_copy:
-        src = os.path.join(src_dir, fname)
-        if os.path.isfile(src):
-            dst = os.path.join(target_dir, fname)
-            copied = False
-            for attempt in range(3):
+        src = ROOT / fname
+        if src.is_file():
+            dst = target_dir / fname
+            for _ in range(3):
                 try:
                     shutil.copy2(src, dst)
-                    print(f"[Setup] Installed: {dst}")
-                    copied = True
+                    print(f"[Setup] Installed: {fname}")
                     break
                 except PermissionError:
                     subprocess.run(["taskkill", "/F", "/IM", "DatasmithWorker.exe"], capture_output=True)
-                    import time
-                    time.sleep(1.0)
-            if not copied:
-                print(f"[Setup] Warning: Could not overwrite {fname} (process still holding file).")
+                    time.sleep(0.5)
+
+    # Copy runtime DLLs alongside the worker executable for direct loading
+    if vendor_dir:
+        v_path = Path(vendor_dir)
+        for dll_name in ("DatasmithFacadeCSharp.dll", "tbbmalloc.dll"):
+            dll_src = v_path / dll_name
+            if dll_src.is_file():
+                shutil.copy2(dll_src, target_dir / dll_name)
+                print(f"[Setup] Installed Runtime Library: {dll_name}")
 
     # Copy icons directory
-    icons_src = os.path.join(src_dir, "icons")
-    icons_dst = os.path.join(target_dir, "icons")
-    if os.path.isdir(icons_src):
-        os.makedirs(icons_dst, exist_ok=True)
-        for icon_file in os.listdir(icons_src):
-            if icon_file.endswith(".svg"):
-                shutil.copy2(os.path.join(icons_src, icon_file), os.path.join(icons_dst, icon_file))
-                print(f"[Setup] Installed Icon: {icon_file}")
-
-    # Ensure obsolete single-file launcher is removed if present
-    plugins_parent = os.path.dirname(target_dir)
-    forwarder_file = os.path.join(plugins_parent, "igz_tm_livesync_plugin.py")
-    if os.path.isfile(forwarder_file):
-        try:
-            os.remove(forwarder_file)
-            print(f"[Setup] Cleaned up obsolete launcher: {forwarder_file}")
-        except Exception:
-            pass
+    icons_src = ROOT / "icons"
+    icons_dst = target_dir / "icons"
+    if icons_src.is_dir():
+        icons_dst.mkdir(parents=True, exist_ok=True)
+        for icon_file in icons_src.glob("*.svg"):
+            shutil.copy2(icon_file, icons_dst / icon_file.name)
+            print(f"[Setup] Installed Icon: {icon_file.name}")
 
     print(f"\n[Setup] Successfully installed extension to: {target_dir}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Build and setup IngeTrazo Twinmotion LiveSync extension.")
-    parser.add_argument("--vendor-dir", help="Path to Epic Datasmith runtime files (DatasmithFacadeCSharp.dll)")
-    parser.add_argument("--install-dir", default=DEFAULT_INGETRAZO_PLUGINS, help="IngeTrazo plugins folder")
+    parser.add_argument("--vendor-dir", default=None, help="Path to Epic Datasmith runtime files")
+    parser.add_argument("--install-dir", default=str(DEFAULT_INGETRAZO_PLUGINS), help="IngeTrazo plugins folder")
+    parser.add_argument("--no-download", action="store_true", help="Do not auto-download Datasmith if missing")
     parser.add_argument("--build-only", action="store_true", help="Compile worker without installing")
+    parser.add_argument("--check-only", action="store_true", help="Verify prerequisites without installing")
     args = parser.parse_args()
 
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-    source_cs = os.path.join(src_dir, "DatasmithWorker.cs")
-    output_exe = os.path.join(src_dir, "DatasmithWorker.exe")
+    vendor = find_or_download_runtime(args.vendor_dir, auto_download=not args.no_download)
 
-    compile_worker(source_cs, output_exe, args.vendor_dir)
+    if args.check_only:
+        print(json.dumps({
+            "prerequisites_ok": True,
+            "vendor_dir": str(vendor),
+            "compiler": str(CSC_PATH),
+            "target_dir": args.install_dir
+        }, indent=2))
+        return
+
+    source_cs = ROOT / "DatasmithWorker.cs"
+    output_exe = ROOT / "DatasmithWorker.exe"
+
+    compile_worker(source_cs, output_exe)
 
     if not args.build_only:
-        install_plugin(args.install_dir)
+        install_plugin(vendor, Path(args.install_dir))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"[Error] Setup failed: {e}", file=sys.stderr)
+        sys.exit(1)
