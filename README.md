@@ -1,5 +1,14 @@
 # IngeTrazo Twinmotion LiveSync Extension
 
+<p align="left">
+  <a href="https://github.com/sponsors/SPACIO-TECHTONICS">
+    <img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=githubsponsors" alt="Sponsor on GitHub" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-GPL--3.0-10b981?style=for-the-badge" alt="License: GPL-3.0" />
+  </a>
+</p>
+
 This extension provides real-time synchronization between **IngeTrazo** (open-source 3D CAD/BIM modeler) and **Twinmotion** using the Epic Games Datasmith DirectLink protocol.
 
 ---

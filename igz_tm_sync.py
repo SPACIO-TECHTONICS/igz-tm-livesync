@@ -514,12 +514,23 @@ class TMSyncDockPanel(QWidget):
         # 1. Connection Status
         status_box = QGroupBox("DirectLink Status", self)
         status_layout = QVBoxLayout(status_box)
+
+        status_header_layout = QHBoxLayout()
         self.status_label = QLabel("● DirectLink Active (UDP 6666 / IPC 19850)", self)
         self.status_label.setStyleSheet("color: #10b981; font-weight: bold;")
-        status_layout.addWidget(self.status_label)
+        status_header_layout.addWidget(self.status_label)
+
+        btn_sponsor = QPushButton("💖 Sponsor", self)
+        btn_sponsor.setStyleSheet("background-color: #262626; color: #fb7185; border: 1px solid #3f3f46; font-size: 11px; padding: 4px 8px;")
+        btn_sponsor.setCursor(Qt.CursorShape.PointingHandCursor if hasattr(Qt, "CursorShape") else Qt.PointingHandCursor)
+        import webbrowser
+        btn_sponsor.clicked.connect(lambda: webbrowser.open("https://github.com/sponsors/SPACIO-TECHTONICS"))
+        status_header_layout.addWidget(btn_sponsor)
+
+        status_layout.addLayout(status_header_layout)
         layout.addWidget(status_box)
 
-        # 2. Options Management (knTMSync workflow)
+        # 2. Options Management
         options_box = QGroupBox("Twinmotion Options", self)
         options_layout = QVBoxLayout(options_box)
 

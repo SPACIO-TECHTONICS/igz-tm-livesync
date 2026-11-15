@@ -16,6 +16,7 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 import urllib.request
+import webbrowser
 
 ROOT = Path(__file__).resolve().parent
 
@@ -75,14 +76,34 @@ class SetupApp:
         header = tk.Frame(self.root, bg=BG_MAIN, padx=24, pady=16)
         header.pack(fill=tk.X)
 
+        title_row = tk.Frame(header, bg=BG_MAIN)
+        title_row.pack(fill=tk.X)
+
         title = tk.Label(
-            header,
+            title_row,
             text="IngeTrazo Twinmotion LiveSync",
             font=("Segoe UI", 18, "bold"),
             fg=TEXT_PRIMARY,
             bg=BG_MAIN
         )
-        title.pack(anchor="w")
+        title.pack(side=tk.LEFT, anchor="w")
+
+        btn_sponsor = tk.Button(
+            title_row,
+            text="💖 Sponsor",
+            font=("Segoe UI", 9, "bold"),
+            bg=BG_CARD,
+            fg="#fb7185",
+            activebackground=BG_CARD_INNER,
+            activeforeground="#f43f5e",
+            bd=1,
+            relief=tk.SOLID,
+            padx=10,
+            pady=3,
+            cursor="hand2",
+            command=lambda: webbrowser.open("https://github.com/sponsors/SPACIO-TECHTONICS")
+        )
+        btn_sponsor.pack(side=tk.RIGHT)
 
         subtitle = tk.Label(
             header,
