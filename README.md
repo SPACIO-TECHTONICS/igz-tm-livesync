@@ -4,15 +4,6 @@ This extension provides real-time synchronization between **IngeTrazo** (open-so
 
 ---
 
-## References & Attribution
-
-This project is inspired by open-source community work:
-
-- **[hamzah1985/ingetrazo-twinmotion-sync](https://github.com/hamzah1985/ingetrazo-twinmotion-sync)** by Hamzah:
-  Provided the reference architecture for unmanaged Datasmith SDK interop, background C# worker design, and IngeTrazo Qt plugin integration.
-
----
-
 ## License
 
 This project is licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**; see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
@@ -128,7 +119,7 @@ f:\igz-tm-livesync\
 ├── .env                  # Environment settings (ports, names, unit scale)
 ├── .env.example          # Configuration template
 ├── .gitignore            # Git exclusion rules
-├── LICENSE               # Apache License, Version 2.0
+├── LICENSE               # GNU General Public License v3.0 or later (GPL-3.0-or-later)
 ├── NOTICE.md             # Third-party notices and attribution
 ├── plugin.json           # Extension manifest for IngeTrazo
 ├── __init__.py           # Package entry point
@@ -214,3 +205,12 @@ Run the test suite to verify the installer, runtime downloader, option sorting, 
 ```powershell
 python -m unittest test_runtime_installer.py test_extension.py
 ```
+
+---
+
+## Attribution & Inspiration
+
+This project is inspired by open-source community work:
+
+- **[hamzah1985/ingetrazo-twinmotion-sync](https://github.com/hamzah1985/ingetrazo-twinmotion-sync)** by Hamzah:
+  Provided the reference architecture for unmanaged Datasmith SDK interop, background C# worker design, and IngeTrazo Qt plugin integration.
